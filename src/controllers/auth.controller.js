@@ -1,7 +1,13 @@
 const { constants: http } = require("http2");
 const { users, profiles } = require('../models');
 const { hashPassword, verifyPassword } = require("../lib/hashPassword");
+const jwt = require('jsonwebtoken');
 
+/**
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ * @returns
+ */
 exports.register = async function (req, res) {
   try {
     const { email, password, confirmPassword } = req.body;
@@ -61,6 +67,11 @@ exports.register = async function (req, res) {
   }
 };
 
+/**
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ * @returns
+ */
 exports.login = async function (req, res) {
   try {
     const { email, password } = req.body;
@@ -92,6 +103,21 @@ exports.login = async function (req, res) {
       });
     }
 
+    const userRole = user.role; 
+
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        role: userRole,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '12h' }
+    );
+
+    const profile = await profiles.findOne({
+      where: { id: user.profile_id },
+    });
+
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,
       message: "Login successful!",
@@ -99,8 +125,10 @@ exports.login = async function (req, res) {
         user: {
           id: user.id,
           email: user.email,
-          profile: user.profile || user.Profile
+          profile: profile,
+          role: userRole 
         },
+        token: token,
       }
     });
 
@@ -110,6 +138,5 @@ exports.login = async function (req, res) {
       message: "Failed to login!",
       errors: err.message,
     });
-
   }
 };
