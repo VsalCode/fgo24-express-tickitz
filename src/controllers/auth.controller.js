@@ -164,7 +164,7 @@ exports.forgotPassword = async function (req, res) {
 
     const otpSaveResult = await setOTP(email, generatedOTP, 10);
     if (!otpSaveResult.success) {
-      return res.status(500).json({
+      return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
         success: false,
         message: "Failed to save OTP!",
         error: otpSaveResult.error,
@@ -195,14 +195,14 @@ exports.resetPassword = async function (req, res) {
   try {
     const { email, otp, newPassword, confirmNewPassword } = req.body;
     if (!email || !otp || !newPassword || !confirmNewPassword) {
-      return res.status(400).json({
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
         message: "all field are required!",
       });
     }
 
     if (newPassword != confirmNewPassword ) {
-      return res.status(400).json({
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
         message: "confirm password must be match with new password!",
       });
@@ -210,7 +210,7 @@ exports.resetPassword = async function (req, res) {
 
     const otpResult = await getOTP(email);
     if (!otpResult.success) {
-      return res.status(500).json({
+      return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
         success: false,
         message: "Failed to verify OTP!",
         error: otpResult.error,
@@ -218,20 +218,34 @@ exports.resetPassword = async function (req, res) {
     }
 
     if (!otpResult.otp) {
-      return res.status(400).json({
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
         message: "OTP not found or has expired!",
       });
     }
 
     if (otpResult.otp !== otp.toString()) {
-      return res.status(400).json({
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
         message: "Invalid OTP!",
       });
     }
 
     await deleteOTP(email);
+
+    const updatePassword = await users.update(
+      { password: hashPassword(newPassword) },
+      {
+        where: { email: email }
+      }
+    );
+    
+    if(!updatePassword){
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
+        success: false,
+        message: "failed to update password or email not valid!",
+      });
+    }
 
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,

@@ -1,45 +1,63 @@
-const { redisClient } = require("../lib/redis");
+const { redisClient, ensureConnection } = require('../lib/redis'); 
 
-function generateOTP() {
-  const otp = Math.floor(100000 + Math.random() * 900000);
-  return otp.toString(); 
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-async function setOTP(email, otp, expiryMinutes = 10) {
-    const key = `otp:${email}`;
-    const expirySeconds = expiryMinutes * 60;
+const setOTP = async (email, otp, expirationMinutes = 10) => {
+  try {
+    await ensureConnection();
     
-    try {
-      await redisClient.setEx(key, expirySeconds, otp);
-      return { success: true };
-    } catch (error) {
-      console.error('Error setting OTP:', error);
-      return { success: false, error: error.message };
-    }
+    const key = `otp:${email}`;
+    const expirationSeconds = expirationMinutes * 3;
+    
+    await redisClient.setEx(key, expirationSeconds, otp);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error setting OTP:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
+  }
 };
 
-async function getOTP(email) {
-    const key = `otp:${email}`;
+const getOTP = async (email) => {
+  try {
+    await ensureConnection();
     
-    try {
-      const otp = await redisClient.get(key);
-      return { success: true, otp };
-    } catch (error) {
-      console.error('Error getting OTP:', error);
-      return { success: false, error: error.message };
-    }
+    const key = `otp:${email}`;
+    const otp = await redisClient.get(key);
+    
+    return { 
+      success: true, 
+      otp: otp 
+    };
+  } catch (error) {
+    console.error('Error getting OTP:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
+  }
 };
 
-async function deleteOTP(email) {
-    const key = `otp:${email}`;
+const deleteOTP = async (email) => {
+  try {
+    await ensureConnection();
     
-    try {
-      await redisClient.del(key);
-      return { success: true };
-    } catch (error) {
-      console.error('Error deleting OTP:', error);
-      return { success: false, error: error.message };
-    }
+    const key = `otp:${email}`;
+    await redisClient.del(key);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting OTP:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
+  }
 };
 
 module.exports = {
@@ -47,4 +65,4 @@ module.exports = {
   setOTP,
   getOTP,
   deleteOTP
-}; 
+};
