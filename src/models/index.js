@@ -10,7 +10,28 @@ const sequelize = new Sequelize(
     host: config.development.host,
     dialect: 'postgres',
     port: config.development.port,
-    logging: false 
+    logging: false,
+    
+    define: {
+      underscored: true,         
+      createdAt: 'created_at',    
+      updatedAt: 'updated_at',    
+      timestamps: true,           
+      freezeTableName: true,      
+      
+      attributes: {
+        created_at: {
+          type: Sequelize.DATE,
+          allowNull: false,
+          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+        },
+        updated_at: {
+          type: Sequelize.DATE,
+          allowNull: false,
+          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+        }
+      }
+    }
   }
 );
 

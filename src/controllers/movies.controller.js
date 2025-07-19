@@ -5,6 +5,7 @@ exports.getAllMovies = async function (req, res){
   try {
 
     const films = await movies.findAll();
+    
 
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,
