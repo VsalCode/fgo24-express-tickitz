@@ -5,6 +5,11 @@ const hashPassword = (password) => {
   return bcrypt.hashSync(password, saltRounds);
 };
 
+const verifyPassword = async (plainPassword, hashedPassword) => {
+  return await bcrypt.compare(plainPassword, hashedPassword);
+};
+
 module.exports = {
-  hashPassword
+  hashPassword,
+  verifyPassword
 };
