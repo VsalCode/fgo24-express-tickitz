@@ -1,7 +1,8 @@
 const { constants: http } = require("http2");
-const { users, profiles } = require('../models');
-const { hashPassword, verifyPassword } = require("../lib/hashPassword");
-const jwt = require('jsonwebtoken');
+const { users, profiles } = require("../models");
+const { hashPassword, verifyPassword } = require("../utils/hashPassword");
+const jwt = require("jsonwebtoken");
+const { generateOTP } = require("../utils/otp");
 
 /**
  * @param {import("express").Request} req
@@ -27,9 +28,9 @@ exports.register = async function (req, res) {
     }
 
     const isExist = await users.findOne({
-      where: { email: email }
+      where: { email: email },
     });
-    
+
     if (isExist) {
       return res.status(http.HTTP_STATUS_CONFLICT).json({
         success: false,
@@ -38,13 +39,13 @@ exports.register = async function (req, res) {
     }
 
     const createdProfile = await profiles.create({
-      fullname: email.split("@")[0]
+      fullname: email.split("@")[0],
     });
 
     const createdUser = await users.create({
       email: email,
       password: hashPassword(password),
-      profile_id: createdProfile.id
+      profile_id: createdProfile.id,
     });
 
     return res.status(http.HTTP_STATUS_CREATED).json({
@@ -53,12 +54,10 @@ exports.register = async function (req, res) {
       results: {
         userId: createdUser.id,
         email: createdUser.email,
-        profileId: createdProfile.id
-      }
+        profileId: createdProfile.id,
+      },
     });
-
   } catch (err) {
-    
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
       message: "Failed to register user!",
@@ -103,7 +102,7 @@ exports.login = async function (req, res) {
       });
     }
 
-    const userRole = user.role; 
+    const userRole = user.role;
 
     const token = jwt.sign(
       {
@@ -111,7 +110,7 @@ exports.login = async function (req, res) {
         role: userRole,
       },
       process.env.JWT_SECRET,
-      { expiresIn: '12h' }
+      { expiresIn: "12h" }
     );
 
     const profile = await profiles.findOne({
@@ -126,16 +125,53 @@ exports.login = async function (req, res) {
           id: user.id,
           email: user.email,
           profile: profile,
-          role: userRole 
+          role: userRole,
         },
         token: token,
-      }
+      },
+    });
+  } catch (err) {
+    return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: "Failed to login!",
+      errors: err.message,
+    });
+  }
+};
+
+/**
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ * @returns
+ */
+exports.forgotPassword = async function (req, res) {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
+        success: false,
+        message: "email address required!",
+      });
+    }
+
+    const generatedOTP = generateOTP();
+    if(!generatedOTP){
+      return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: "try again! failed to generate OTP",
+      });
+    }
+    
+    return res.status(http.HTTP_STATUS_OK).json({
+      success: true,
+      message: "OTP successful sended to your email!",
+      results: generatedOTP
     });
 
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
-      message: "Failed to login!",
+      message: "Failed to send OTP!",
       errors: err.message,
     });
   }
