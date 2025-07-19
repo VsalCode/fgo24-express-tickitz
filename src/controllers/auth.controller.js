@@ -2,7 +2,7 @@ const { constants: http } = require("http2");
 const { users, profiles } = require("../models");
 const { hashPassword, verifyPassword } = require("../utils/hashPassword");
 const jwt = require("jsonwebtoken");
-const { generateOTP } = require("../utils/otp");
+const { generateOTP, setOTP, getOTP, deleteOTP } = require("../utils/otpService")
 
 /**
  * @param {import("express").Request} req
@@ -161,6 +161,15 @@ exports.forgotPassword = async function (req, res) {
         message: "try again! failed to generate OTP",
       });
     }
+
+    const otpSaveResult = await setOTP(email, generatedOTP, 10);
+    if (!otpSaveResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to save OTP!",
+        error: otpSaveResult.error,
+      });
+    }
     
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,
@@ -176,3 +185,64 @@ exports.forgotPassword = async function (req, res) {
     });
   }
 };
+
+/**
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ * @returns
+ */
+exports.resetPassword = async function (req, res) {
+  try {
+    const { email, otp, newPassword, confirmNewPassword } = req.body
+    if (!email || !otp || !newPassword || !confirmNewPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "all field are required!",
+      });
+    }
+
+    if (newPassword != confirmNewPassword ) {
+      return res.status(400).json({
+        success: false,
+        message: "confirm password must be match with new password!",
+      });
+    }
+
+    const otpResult = await getOTP(email);
+    if (!otpResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to verify OTP!",
+        error: otpResult.error,
+      });
+    }
+
+    if (!otpResult.otp) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP not found or has expired!",
+      });
+    }
+
+    if (otpResult.otp !== otp.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP!",
+      });
+    }
+
+    await deleteOTP(email);
+
+    return res.status(http.HTTP_STATUS_OK).json({
+      success: true,
+      message: "success to reset password!",
+    });
+
+  } catch (err) {
+    return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: "Failed to reset password!",
+      errors: err.message,
+    });
+  }
+}
