@@ -1,5 +1,5 @@
 const routers = require("express").Router();
 
-routers.use("/movies", require("./movies.router") );
+routers.use("/auth", require("./auth.router") );
 
 module.exports = routers;
