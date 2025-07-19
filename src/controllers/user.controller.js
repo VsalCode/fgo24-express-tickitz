@@ -1,4 +1,3 @@
-// user.controller.js
 const { constants: http } = require("http2");
 const { users, profiles } = require("../models");
 
@@ -8,7 +7,7 @@ exports.getUserProfile = async function (req, res) {
         const userData = await users.findOne({ where: { id: userId } });
         const profileData = await profiles.findOne({ where: { id: userData.profile_id } });
 
-        if (!userProfile) {
+        if (!userData) {
             return res.status(http.HTTP_STATUS_NOT_FOUND).json({
                 success: false,
                 message: "User profile not found!",
@@ -32,4 +31,4 @@ exports.getUserProfile = async function (req, res) {
             errors: err.message,
         });
     }
-}
+};

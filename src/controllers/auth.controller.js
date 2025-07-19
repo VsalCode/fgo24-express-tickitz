@@ -2,7 +2,7 @@ const { constants: http } = require("http2");
 const { users, profiles } = require("../models");
 const { hashPassword, verifyPassword } = require("../utils/hashPassword");
 const jwt = require("jsonwebtoken");
-const { generateOTP, setOTP, getOTP, deleteOTP } = require("../utils/otpService")
+const { generateOTP, setOTP, getOTP, deleteOTP } = require("../utils/otpService");
 
 /**
  * @param {import("express").Request} req
@@ -193,7 +193,7 @@ exports.forgotPassword = async function (req, res) {
  */
 exports.resetPassword = async function (req, res) {
   try {
-    const { email, otp, newPassword, confirmNewPassword } = req.body
+    const { email, otp, newPassword, confirmNewPassword } = req.body;
     if (!email || !otp || !newPassword || !confirmNewPassword) {
       return res.status(400).json({
         success: false,
@@ -245,4 +245,4 @@ exports.resetPassword = async function (req, res) {
       errors: err.message,
     });
   }
-}
+};

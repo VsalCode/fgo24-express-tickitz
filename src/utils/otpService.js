@@ -1,4 +1,4 @@
-const { redisClient } = require("../lib/redis")
+const { redisClient } = require("../lib/redis");
 
 function generateOTP() {
   const otp = Math.floor(100000 + Math.random() * 900000);
@@ -34,7 +34,7 @@ async function deleteOTP(email) {
     const key = `otp:${email}`;
     
     try {
-      await client.del(key);
+      await redisClient.del(key);
       return { success: true };
     } catch (error) {
       console.error('Error deleting OTP:', error);
