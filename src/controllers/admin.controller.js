@@ -11,69 +11,101 @@ const {
 const { sequelize } = require("../models");
 
 exports.addNewMovie = async function (req, res) {
-  const transaction = await sequelize.transaction();
+const transaction = await sequelize.transaction();
 
   try {
     const userId = req.userId;
     const userRole = req.userRole;
 
-    console.log(userId);
-    console.log(userRole);
-
     if (!userId || !userRole) {
+      await transaction.rollback();
       return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
         success: false,
         message: "You Must Login or register!",
       });
     }
 
-    if (userRole != "admin") {
+    if (userRole !== "admin") {
+      await transaction.rollback();
       return res.status(http.HTTP_STATUS_FORBIDDEN).json({
         success: false,
-        message: "You doesnt have access!",
+        message: "You doesn't have access!",
       });
     }
 
     const {
-      backdropPath,
-      castIds, 
-      directorIds, 
-      genreIds, 
+      castIds: castIdsString, 
+      directorIds: directorIdsString,
+      genreIds: genreIdsString,
       overview,
-      posterPath,
       releaseDate,
       runtime,
       title,
       voteAverage,
     } = req.body;
 
+    let castIds, directorIds, genreIds;
+    try {
+      castIds = castIdsString ? JSON.parse(castIdsString) : [];
+      directorIds = directorIdsString ? JSON.parse(directorIdsString) : [];
+      genreIds = genreIdsString ? JSON.parse(genreIdsString) : [];
+    } catch (parseError) {
+      await transaction.rollback();
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
+        success: false,
+        message: "Invalid format for array fields. Use JSON arrays like [1,2,3]",
+        errors: parseError.message
+      });
+    }
+
     if (
-      !backdropPath ||
-      !castIds ||
-      !directorIds ||
-      !genreIds ||
+      !castIds.length ||
+      !directorIds.length ||
+      !genreIds.length ||
       !overview ||
-      !posterPath ||
       !releaseDate ||
       !runtime ||
       !title ||
       !voteAverage
     ) {
+      await transaction.rollback();
       return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
-        message: "All fields are required!",
+        message: "All fields are required and arrays cannot be empty!",
       });
     }
 
+    if (!Array.isArray(castIds) || !Array.isArray(directorIds) || !Array.isArray(genreIds)) {
+      await transaction.rollback();
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
+        success: false,
+        message: "castIds, directorIds, and genreIds must be arrays",
+      });
+    }
+
+    if (!req.files || !req.files['poster'] || !req.files['backdrop']) {
+      await transaction.rollback();
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
+        success: false,
+        message: "Both poster and backdrop files are required",
+      });
+    }
+
+    const posterFile = req.files['poster'][0];
+    const backdropFile = req.files['backdrop'][0];
+
+    const posterFilename = posterFile.filename;
+    const backdropFilename = backdropFile.filename;
+
     const newMovie = await movies.create(
       {
-        backdrop_path: backdropPath,
+        backdrop_path: backdropFilename,
         overview,
-        poster_path: posterPath,
+        poster_path: posterFilename,
         release_date: releaseDate,
-        runtime,
+        runtime: parseInt(runtime, 10),
         title,
-        vote_average: voteAverage,
+        vote_average: parseFloat(voteAverage),
       },
       { transaction }
     );
