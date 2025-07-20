@@ -4,8 +4,8 @@ const {
   transaction_details: transactionDetails,
 } = require("../models");
 
-exports.bookingTickets = async function(req, res){
-     try {
+exports.bookingTickets = async function (req, res) {
+  try {
     const userId = req.userId;
     const {
       amount,
@@ -96,32 +96,31 @@ exports.bookingTickets = async function(req, res){
 };
 
 exports.getTicketResult = async function (req, res) {
-
   try {
     const userId = req.userId;
-    if(!userId){
+    if (!userId) {
       return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
         success: false,
         message: "you must login or register!",
-      });  
+      });
     }
     const trxParamsId = req.params.id;
-    if(!trxParamsId){
-        return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
+    if (!trxParamsId) {
+      return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
         success: false,
         message: "invalid transactions id!",
-      });  
+      });
     }
 
     const getTrx = await transactions.findOne({
-      where: { 
-        user_id: userId, 
-        id: trxParamsId
-      }
+      where: {
+        user_id: userId,
+        id: trxParamsId,
+      },
     });
 
     const getTrxDetail = await transactionDetails.findAll({
-      where: { transaction_id: getTrx.id }
+      where: { transaction_id: getTrx.id },
     });
 
     return res.status(http.HTTP_STATUS_OK).json({
@@ -129,10 +128,44 @@ exports.getTicketResult = async function (req, res) {
       message: "get ticket result successfully!",
       results: {
         getTrx,
-        seats: getTrxDetail
-      }
+        seats: getTrxDetail,
+      },
     });
- 
+  } catch (err) {
+    return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: "error while processing request.",
+      errors: err.message,
+    });
+  }
+};
+
+exports.getTransactionsHistory = async function (req, res) {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
+        success: false,
+        message: "you must login or register!",
+      });
+    }
+
+    const getTrxHistory = await transactions.findAll({
+      where: { user_id: parseInt(userId) },
+      include: [
+        {
+          model: transactionDetails,
+          as: "details", 
+        },
+      ],
+    });
+
+    return res.status(http.HTTP_STATUS_OK).json({
+      success: true,
+      message: "get transaction history successfully!",
+      results: getTrxHistory
+    });
+
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
