@@ -102,12 +102,10 @@ exports.login = async function (req, res) {
       });
     }
 
-    const userRole = user.role;
-
     const token = jwt.sign(
       {
         userId: user.id,
-        role: userRole,
+        role: user.roles,
       },
       process.env.JWT_SECRET,
       { expiresIn: "12h" }
@@ -125,7 +123,7 @@ exports.login = async function (req, res) {
           id: user.id,
           email: user.email,
           profile: profile,
-          role: userRole,
+          role: user.roles,
         },
         token: token,
       },
