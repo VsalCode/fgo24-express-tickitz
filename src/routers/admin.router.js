@@ -4,6 +4,7 @@ const { fileUpload } = require("../middlewares/fileUpload.middleware");
 
 const adminController = require("../controllers/admin.controller");
 
+adminRouter.delete("/:id", verifyToken, adminController.deleteMovie );
 adminRouter.post("", 
   verifyToken, 
   fileUpload.fields([

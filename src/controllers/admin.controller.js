@@ -11,7 +11,7 @@ const {
 const { sequelize } = require("../models");
 
 exports.addNewMovie = async function (req, res) {
-const transaction = await sequelize.transaction();
+  const transaction = await sequelize.transaction();
 
   try {
     const userId = req.userId;
@@ -34,7 +34,7 @@ const transaction = await sequelize.transaction();
     }
 
     const {
-      castIds: castIdsString, 
+      castIds: castIdsString,
       directorIds: directorIdsString,
       genreIds: genreIdsString,
       overview,
@@ -53,8 +53,9 @@ const transaction = await sequelize.transaction();
       await transaction.rollback();
       return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
-        message: "Invalid format for array fields. Use JSON arrays like [1,2,3]",
-        errors: parseError.message
+        message:
+          "Invalid format for array fields. Use JSON arrays like [1,2,3]",
+        errors: parseError.message,
       });
     }
 
@@ -75,7 +76,11 @@ const transaction = await sequelize.transaction();
       });
     }
 
-    if (!Array.isArray(castIds) || !Array.isArray(directorIds) || !Array.isArray(genreIds)) {
+    if (
+      !Array.isArray(castIds) ||
+      !Array.isArray(directorIds) ||
+      !Array.isArray(genreIds)
+    ) {
       await transaction.rollback();
       return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
@@ -83,7 +88,7 @@ const transaction = await sequelize.transaction();
       });
     }
 
-    if (!req.files || !req.files['poster'] || !req.files['backdrop']) {
+    if (!req.files || !req.files["poster"] || !req.files["backdrop"]) {
       await transaction.rollback();
       return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
@@ -91,8 +96,8 @@ const transaction = await sequelize.transaction();
       });
     }
 
-    const posterFile = req.files['poster'][0];
-    const backdropFile = req.files['backdrop'][0];
+    const posterFile = req.files["poster"][0];
+    const backdropFile = req.files["backdrop"][0];
 
     const posterFilename = posterFile.filename;
     const backdropFilename = backdropFile.filename;
@@ -185,13 +190,74 @@ const transaction = await sequelize.transaction();
         })),
       },
     });
-
   } catch (error) {
     await transaction.rollback();
 
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
       message: error.message || "Failed to add new movie",
+    });
+  }
+};
+
+exports.deleteMovie = async function (req, res) {
+  try {
+    const userId = req.userId;
+    const userRole = req.userRole;
+
+    if (!userId || !userRole) {
+      return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
+        success: false,
+        message: "You Must Login or register!",
+      });
+    }
+
+    if (userRole !== "admin") {
+      return res.status(http.HTTP_STATUS_FORBIDDEN).json({
+        success: false,
+        message: "You don't have access!",
+      });
+    }
+
+    const movieIdParams = req.params.id;
+    
+    if (!movieIdParams || isNaN(movieIdParams)) {
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
+        success: false,
+        message: "Invalid movie ID provided",
+      });
+    }
+
+    const movieIdInt = parseInt(movieIdParams);
+    
+    const existingMovie = await movies.findByPk(movieIdInt);
+    if (!existingMovie) {
+      return res.status(http.HTTP_STATUS_NOT_FOUND).json({
+        success: false,
+        message: "Movie not found",
+      });
+    }
+
+    const deletedCount = await movies.destroy({
+      where: { id: movieIdInt },
+    });
+
+    if (deletedCount === 0) {
+      return res.status(http.HTTP_STATUS_NOT_FOUND).json({
+        success: false,
+        message: "Movie not found or already deleted",
+      });
+    }
+
+    return res.status(http.HTTP_STATUS_OK).json({
+      success: true,
+      message: `Movie with id ${movieIdInt} deleted successfully`,
+    });
+
+  } catch (err) {
+    return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: err.message || "Failed to delete movie",
     });
   }
 };
