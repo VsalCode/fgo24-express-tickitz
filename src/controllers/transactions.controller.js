@@ -1,8 +1,11 @@
 const { constants: http } = require("http2");
-const { transactions, transaction_details: transactionDetails } = require("../models");
+const {
+  transactions,
+  transaction_details: transactionDetails,
+} = require("../models");
 
-exports.bookingTickets = async function (req, res) {
-  try {
+exports.bookingTickets = async function(req, res){
+     try {
     const userId = req.userId;
     const {
       amount,
@@ -15,7 +18,7 @@ exports.bookingTickets = async function (req, res) {
       paymentMethodId,
       showDate,
       showTime,
-      seats, 
+      seats,
     } = req.body;
 
     if (
@@ -37,7 +40,7 @@ exports.bookingTickets = async function (req, res) {
       });
     }
 
-    let transactionResult; 
+    let transactionResult;
     try {
       transactionResult = await transactions.create({
         user_id: userId,
@@ -60,9 +63,9 @@ exports.bookingTickets = async function (req, res) {
         });
       }
 
-      const seatDetailPromises = seats.map(seat => {
+      const seatDetailPromises = seats.map((seat) => {
         return transactionDetails.create({
-          seat: seat, 
+          seat: seat,
           transaction_id: transactionResult.id,
         });
       });
@@ -74,9 +77,8 @@ exports.bookingTickets = async function (req, res) {
         message: "Tickets booked successfully!",
         data: {
           transactionId: transactionResult.id,
-        }
+        },
       });
-
     } catch (err) {
       return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -84,7 +86,53 @@ exports.bookingTickets = async function (req, res) {
         errors: err.message,
       });
     }
+  } catch (err) {
+    return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: "error while processing request.",
+      errors: err.message,
+    });
+  }
+};
 
+exports.getTicketResult = async function (req, res) {
+
+  try {
+    const userId = req.userId;
+    if(!userId){
+      return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
+        success: false,
+        message: "you must login or register!",
+      });  
+    }
+    const trxParamsId = req.params.id;
+    if(!trxParamsId){
+        return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
+        success: false,
+        message: "invalid transactions id!",
+      });  
+    }
+
+    const getTrx = await transactions.findOne({
+      where: { 
+        user_id: userId, 
+        id: trxParamsId
+      }
+    });
+
+    const getTrxDetail = await transactionDetails.findAll({
+      where: { transaction_id: getTrx.id }
+    });
+
+    return res.status(http.HTTP_STATUS_OK).json({
+      success: true,
+      message: "get ticket result successfully!",
+      results: {
+        getTrx,
+        seats: getTrxDetail
+      }
+    });
+ 
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
