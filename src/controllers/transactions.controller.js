@@ -117,20 +117,27 @@ exports.getTicketResult = async function (req, res) {
         user_id: userId,
         id: trxParamsId,
       },
+      include: [
+        {
+          model: transactionDetails,
+          as: "details",
+        },
+      ],
     });
 
-    const getTrxDetail = await transactionDetails.findAll({
-      where: { transaction_id: getTrx.id },
-    });
+    if (!getTrx) {
+      return res.status(http.HTTP_STATUS_NOT_FOUND).json({
+        success: false,
+        message: "Transaction not found!",
+      });
+    }
 
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,
       message: "get ticket result successfully!",
-      results: {
-        getTrx,
-        seats: getTrxDetail,
-      },
+      results: getTrx
     });
+
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -155,7 +162,7 @@ exports.getTransactionsHistory = async function (req, res) {
       include: [
         {
           model: transactionDetails,
-          as: "details", 
+          as: "details",
         },
       ],
     });
@@ -163,9 +170,8 @@ exports.getTransactionsHistory = async function (req, res) {
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,
       message: "get transaction history successfully!",
-      results: getTrxHistory
+      results: getTrxHistory,
     });
-
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
