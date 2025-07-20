@@ -1,5 +1,5 @@
 const express = require("express");
-const { constant: http } = require("http2");
+const { constants: http } = require("http2");
 const morgan = require("morgan");
 
 const app = express();
