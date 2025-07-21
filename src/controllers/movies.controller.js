@@ -1,5 +1,5 @@
 const { constants: http } = require("http2");
-const { movies, genres, directors, casts } = require("../models");
+const { movies, genres, directors, casts, Sequelize } = require("../models");
 const { Op } = require("sequelize");
 
 exports.getAllMovies = async function (req, res) {
@@ -8,20 +8,38 @@ exports.getAllMovies = async function (req, res) {
     const filterByGenre = req.query.filter;
     const limit = req.query.limit;
     const offset = req.query.offset;
+    const sortBy = req.query.sortBy;
+
+    let order = [];
+
+    if (sortBy) {
+      if (sortBy === "highest_rating") {
+        order.push(["vote_average", "DESC"]);
+      } else if (sortBy === "lowest_rating") {
+        order.push(["vote_average", "ASC"]);
+      } else if (sortBy === "title_asc") {
+        order.push([Sequelize.fn("LOWER", Sequelize.col("title")), "ASC"]);
+      } else if (sortBy === "title_desc") {
+        order.push([Sequelize.fn("LOWER", Sequelize.col("title")), "DESC"]);
+      } else if (sortBy == "popularity") {
+        order.push(["popularity", "DESC"]);
+      }
+    };
 
     const moviesData = await movies.findAll({
       include: [
-        { 
-          model: genres, 
+        {
+          model: genres,
           as: "genres",
-          where: filterByGenre && { id: parseInt(filterByGenre) } 
+          where: filterByGenre && { id: parseInt(filterByGenre) },
         },
         { model: casts, as: "casts" },
         { model: directors, as: "directors" },
       ],
       where: {
-        ...(search && { title : { [Op.iLike]: `%${search}%` }}),
+        ...(search && { title: { [Op.iLike]: `%${search}%` } }),
       },
+      order: order.length > 0 ? order : [['created_at', 'ASC' ]],
       limit: limit,
       offset: offset,
     });
@@ -38,6 +56,7 @@ exports.getAllMovies = async function (req, res) {
         release_date: movie.release_date,
         runtime: movie.runtime,
         vote_average: movie.vote_average,
+        popularity: movie.popularity,
         genres: movie.genres.map((genre) => ({
           id: genre.id,
           name: genre.name,
