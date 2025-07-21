@@ -1,6 +1,6 @@
-const Sequelize = require('sequelize');
+// const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('casts', {
+  const Casts = sequelize.define('casts', {
     id: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
@@ -26,4 +26,14 @@ module.exports = function(sequelize, DataTypes) {
       },
     ]
   });
+
+  Casts.associate = function(models) {
+    Casts.belongsToMany(models.movies, {
+      through: models.movie_casts,
+      foreignKey: 'cast_id',
+      otherKey: 'movie_id'
+    });
+  };
+
+  return Casts;
 };

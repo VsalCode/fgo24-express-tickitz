@@ -1,6 +1,6 @@
-const Sequelize = require('sequelize');
+// const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('movies', {
+  const Movies = sequelize.define('movies', {
     id: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
@@ -63,4 +63,31 @@ module.exports = function(sequelize, DataTypes) {
       },
     ]
   });
+
+  Movies.associate = function(models) {
+    Movies.belongsToMany(models.genres, {
+      through: models.movie_genres,
+      foreignKey: 'movie_id',
+      otherKey: 'genre_id'
+    });
+    
+    Movies.belongsToMany(models.directors, {
+      through: models.movie_directors,
+      foreignKey: 'movie_id',
+      otherKey: 'director_id'
+    });
+    
+    Movies.belongsToMany(models.casts, {
+      through: models.movie_casts,
+      foreignKey: 'movie_id',
+      otherKey: 'cast_id'
+    });
+    
+    Movies.belongsTo(models.users, {
+      foreignKey: 'admin_id',
+      as: 'admin'
+    });
+  };
+
+  return Movies;
 };

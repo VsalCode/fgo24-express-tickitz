@@ -1,6 +1,6 @@
-const Sequelize = require('sequelize');
+// const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('genres', {
+  const Genres = sequelize.define('genres', {
     id: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
@@ -34,4 +34,14 @@ module.exports = function(sequelize, DataTypes) {
       },
     ]
   });
+
+  Genres.associate = function(models) {
+    Genres.belongsToMany(models.movies, {
+      through: models.movie_genres,
+      foreignKey: 'genre_id',
+      otherKey: 'movie_id'
+    });
+  };
+
+  return Genres;
 };
