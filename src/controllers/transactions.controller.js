@@ -2,6 +2,7 @@ const { constants: http } = require("http2");
 const {
   transactions,
   transaction_details: transactionDetails,
+  payment_method: paymentMethod
 } = require("../models");
 
 exports.bookingTickets = async function (req, res) {
@@ -135,9 +136,8 @@ exports.getTicketResult = async function (req, res) {
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,
       message: "get ticket result successfully!",
-      results: getTrx
+      results: getTrx,
     });
-
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -171,6 +171,30 @@ exports.getTransactionsHistory = async function (req, res) {
       success: true,
       message: "get transaction history successfully!",
       results: getTrxHistory,
+    });
+  } catch (err) {
+    return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: "error while processing request.",
+      errors: err.message,
+    });
+  }
+};
+
+exports.getPaymentMethods = async function (req, res) {
+  try {
+    const getPayments = await paymentMethod.findAll();
+    if(!getPayments){
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
+      success: false,
+      message: "error while get payment methods",
+    });  
+    }
+
+    return res.status(http.HTTP_STATUS_OK).json({
+      success: true,
+      message: "get transaction history successfully!",
+      results: getPayments,
     });
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
