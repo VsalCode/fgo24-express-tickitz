@@ -1,9 +1,9 @@
 const { constants: http } = require("http2");
 const {
   movies,
-  movie_casts,
-  movie_directors,
-  movie_genres,
+  movie_casts: movieCasts,
+  movie_directors: movieDirectors,
+  movie_genres: movieGenres,
   genres,
   directors,
   casts,
@@ -129,7 +129,7 @@ exports.addNewMovie = async function (req, res) {
       genre_id: genreId,
     }));
 
-    await movie_genres.bulkCreate(genreMovieRelations, { transaction });
+    await movieGenres.bulkCreate(genreMovieRelations, { transaction });
 
     const castRecords = await casts.findAll({
       where: { id: castIds },
@@ -145,7 +145,7 @@ exports.addNewMovie = async function (req, res) {
       cast_id: castId,
     }));
 
-    await movie_casts.bulkCreate(castMovieRelations, { transaction });
+    await movieCasts.bulkCreate(castMovieRelations, { transaction });
 
     const directorRecords = await directors.findAll({
       where: { id: directorIds },
@@ -161,7 +161,7 @@ exports.addNewMovie = async function (req, res) {
       director_id: directorId,
     }));
 
-    await movie_directors.bulkCreate(directorMovieRelations, { transaction });
+    await movieDirectors.bulkCreate(directorMovieRelations, { transaction });
     await transaction.commit();
 
     return res.status(http.HTTP_STATUS_CREATED).json({
@@ -196,6 +196,137 @@ exports.addNewMovie = async function (req, res) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
       message: error.message || "Failed to add new movie",
+    });
+  }
+};
+
+exports.updateMovie = async function (req, res) {
+  const transaction = await sequelize.transaction();
+  let isTransactionFinished = false;
+
+  try {
+    const userId = req.userId;
+    const userRole = req.userRole;
+    const movieId = req.params.id;
+
+    if (!userId || !userRole) {
+      return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
+        success: false,
+        message: "You Must Login or register!",
+      });
+    }
+
+    if (userRole !== "admin") {
+      return res.status(http.HTTP_STATUS_FORBIDDEN).json({
+        success: false,
+        message: "You doesn't have access!",
+      });
+    }
+
+    const {
+      castIds: castIdsString,
+      directorIds: directorIdsString,
+      genreIds: genreIdsString,
+      overview,
+      releaseDate,
+      runtime,
+      title,
+      voteAverage,
+      backdrop_path,
+      poster_path,
+    } = req.body;
+
+    let castIds = castIdsString ? JSON.parse(castIdsString) : null;
+    let directorIds = directorIdsString ? JSON.parse(directorIdsString) : null;
+    let genreIds = genreIdsString ? JSON.parse(genreIdsString) : null;
+
+    const movie = await movies.findByPk(movieId, { 
+      transaction,
+      include: [
+        { model: genres, as: 'genres' },
+        { model: casts, as: 'casts' },
+        { model: directors, as: 'directors' }
+      ]
+    });
+
+    if (!movie) {
+      await transaction.rollback();
+      isTransactionFinished = true;
+      return res.status(http.HTTP_STATUS_NOT_FOUND).json({
+        success: false,
+        message: "Movie not found!",
+      });
+    }
+
+    await movie.update({
+      overview,
+      release_date: releaseDate,
+      runtime,
+      title,
+      vote_average: voteAverage,
+      backdrop_path,
+      poster_path,
+    }, { transaction });
+
+    if (castIds) {
+      await movie.setCasts(castIds, { transaction });
+    }
+
+    if (directorIds) {
+      await movie.setDirectors(directorIds, { transaction });
+    }
+
+    if (genreIds) {
+      await movie.setGenres(genreIds, { transaction });
+    }
+
+    await transaction.commit();
+    isTransactionFinished = true;
+
+    await movie.reload({
+      include: [
+        { model: genres, as: 'genres' },
+        { model: casts, as: 'casts' },
+        { model: directors, as: 'directors' }
+      ],
+    });
+
+    return res.status(http.HTTP_STATUS_OK).json({
+      success: true,
+      message: "Movie updated successfully!",
+      results: {
+        id: movie.id,
+        title: movie.title,
+        overview: movie.overview,
+        backdrop_path: movie.backdrop_path,
+        poster_path: movie.poster_path,
+        release_date: movie.release_date,
+        runtime: movie.runtime,
+        vote_average: movie.vote_average,
+        genres: movie.genres.map(genre => ({
+          id: genre.id,
+          name: genre.name
+        })),
+        casts: movie.casts.map(cast => ({
+          id: cast.id,
+          name: cast.name
+        })),
+        directors: movie.directors.map(director => ({
+          id: director.id,
+          name: director.name
+        }))
+      },
+    });
+
+  } catch (error) {
+    if (!isTransactionFinished) {
+      await transaction.rollback();
+    }
+
+    return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: "Failed to request update movie",
+      errors: error.message
     });
   }
 };

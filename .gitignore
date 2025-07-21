@@ -1,5 +1,6 @@
 .env
 uploads/
+backup.js
 
 # Logs
 logs
