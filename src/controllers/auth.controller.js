@@ -9,6 +9,7 @@ const {
   getOTP,
   deleteOTP,
 } = require("../utils/otpService");
+const { validationResult } = require("express-validator");
 
 /**
  * @param {import("express").Request} req
@@ -17,19 +18,14 @@ const {
  */
 exports.register = async function (req, res) {
   try {
-    const { email, password, confirmPassword } = req.body;
+    const { email, password } = req.body;
 
-    if (!email || !password || !confirmPassword) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
       return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
-        message: "Email, password, and confirm password are required!",
-      });
-    }
-
-    if (password !== confirmPassword) {
-      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
-        success: false,
-        message: "Password and confirm password must be the same!",
+        message: "Validation failed.",
+        errors: errors.array(),
       });
     }
 
@@ -81,27 +77,25 @@ exports.login = async function (req, res) {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
       return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
-        message: "Email and password are required!",
+        message: 'Validation failed.',
+        errors: errors.array(),
       });
     }
-
+    
     const user = await users.findOne({
-      where: { email: email },
+      where: { 
+        email: email, 
+      },
     });
-
-    if (!user) {
-      return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
-        success: false,
-        message: "Invalid email or password!",
-      });
-    }
 
     const isPasswordValid = await verifyPassword(password, user.password);
 
-    if (!isPasswordValid) {
+    if (!user || !isPasswordValid) {
       return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
         success: false,
         message: "Invalid email or password!",
@@ -263,7 +257,6 @@ exports.resetPassword = async function (req, res) {
   }
 };
 
-
 /**
  * @param {import("express").Request} req
  * @param {import("express").Response} res
@@ -293,7 +286,6 @@ exports.logout = async function (req, res) {
       success: true,
       message: "logout successfully!",
     });
-
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
