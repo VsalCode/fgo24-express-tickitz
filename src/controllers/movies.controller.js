@@ -1,14 +1,30 @@
 const { constants: http } = require("http2");
 const { movies, genres, directors, casts, Sequelize } = require("../models");
 const { Op } = require("sequelize");
+const { redisClient, ensureConnection } = require('../lib/redis'); 
 
 exports.getAllMovies = async function (req, res) {
   try {
-    const search = req.query.search;
-    const filterByGenre = req.query.filter;
-    const limit = req.query.limit;
-    const offset = req.query.offset;
-    const sortBy = req.query.sortBy;
+    await ensureConnection();
+
+    const search = req.query.search || '';
+    const filterByGenre = req.query.filter || '';
+    const limit = req.query.limit || 10;
+    const offset = req.query.offset || 0;
+    const sortBy = req.query.sortBy || 'created_at_asc';
+
+    const cacheKey = `movies:`;
+
+    const cachedData = await redisClient.get(cacheKey);
+
+    if (cachedData) {
+      console.log('Serving from cache:', cacheKey);
+      return res.status(http.HTTP_STATUS_OK).json({
+        success: true,
+        message: "Get all movies successfully from cache!",
+        results: JSON.parse(cachedData),
+      });
+    }
 
     let order = [];
 
@@ -23,15 +39,18 @@ exports.getAllMovies = async function (req, res) {
         order.push([Sequelize.fn("LOWER", Sequelize.col("title")), "DESC"]);
       } else if (sortBy == "popularity") {
         order.push(["popularity", "DESC"]);
+      } else if (sortBy == "created_at_asc") {
+        order.push(['created_at', 'ASC']);
       }
-    };
+    }
 
     const moviesData = await movies.findAll({
       include: [
         {
           model: genres,
           as: "genres",
-          where: filterByGenre && { id: parseInt(filterByGenre) },
+          where: filterByGenre ? { id: parseInt(filterByGenre) } : {},
+          required: !!filterByGenre,
         },
         { model: casts, as: "casts" },
         { model: directors, as: "directors" },
@@ -39,39 +58,45 @@ exports.getAllMovies = async function (req, res) {
       where: {
         ...(search && { title: { [Op.iLike]: `%${search}%` } }),
       },
-      order: order.length > 0 ? order : [['created_at', 'ASC' ]],
-      limit: limit,
-      offset: offset,
+      order: order.length > 0 ? order : [['created_at', 'ASC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
     });
+
+    const formattedMoviesData = moviesData.map((movie) => ({
+      id: movie.id,
+      title: movie.title,
+      overview: movie.overview,
+      backdrop_path: movie.backdrop_path,
+      poster_path: movie.poster_path,
+      release_date: movie.release_date,
+      runtime: movie.runtime,
+      vote_average: movie.vote_average,
+      popularity: movie.popularity,
+      genres: movie.genres.map((genre) => ({
+        id: genre.id,
+        name: genre.name,
+      })),
+      casts: movie.casts.map((cast) => ({
+        id: cast.id,
+        name: cast.name,
+      })),
+      directors: movie.directors.map((director) => ({
+        id: director.id,
+        name: director.name,
+      })),
+    }));
+
+    await redisClient.setEx(cacheKey, 3600, JSON.stringify(formattedMoviesData));
 
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,
       message: "Get all movies successfully!",
-      results: moviesData.map((movie) => ({
-        id: movie.id,
-        title: movie.title,
-        overview: movie.overview,
-        backdrop_path: movie.backdrop_path,
-        poster_path: movie.poster_path,
-        release_date: movie.release_date,
-        runtime: movie.runtime,
-        vote_average: movie.vote_average,
-        popularity: movie.popularity,
-        genres: movie.genres.map((genre) => ({
-          id: genre.id,
-          name: genre.name,
-        })),
-        casts: movie.casts.map((cast) => ({
-          id: cast.id,
-          name: cast.name,
-        })),
-        directors: movie.directors.map((director) => ({
-          id: director.id,
-          name: director.name,
-        })),
-      })),
+      results: formattedMoviesData,
     });
+
   } catch (err) {
+    console.error("Error in getAllMovies:", err);
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
       message: "Failed to retrieve movies",
@@ -79,6 +104,7 @@ exports.getAllMovies = async function (req, res) {
     });
   }
 };
+
 
 exports.getMovieDetail = async function (req, res) {
   try {
