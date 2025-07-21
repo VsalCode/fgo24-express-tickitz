@@ -1,8 +1,14 @@
 const { constants: http } = require("http2");
+const jwt = require("jsonwebtoken");
 const { users, profiles } = require("../models");
 const { hashPassword, verifyPassword } = require("../utils/hashPassword");
-const jwt = require("jsonwebtoken");
-const { generateOTP, setOTP, getOTP, deleteOTP } = require("../utils/otpService");
+const { blacklistToken } = require("../utils/blacklistToken");
+const {
+  generateOTP,
+  setOTP,
+  getOTP,
+  deleteOTP,
+} = require("../utils/otpService");
 
 /**
  * @param {import("express").Request} req
@@ -153,14 +159,14 @@ exports.forgotPassword = async function (req, res) {
     }
 
     const generatedOTP = generateOTP();
-    if(!generatedOTP){
+    if (!generatedOTP) {
       return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
         success: false,
         message: "try again! failed to generate OTP",
       });
     }
 
-    const otpSaveResult = await setOTP(email, generatedOTP, 10);
+    const otpSaveResult = await setOTP(email, generatedOTP, 3);
     if (!otpSaveResult.success) {
       return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -168,13 +174,12 @@ exports.forgotPassword = async function (req, res) {
         error: otpSaveResult.error,
       });
     }
-    
+
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,
       message: "OTP successful sended to your email!",
-      results: generatedOTP
+      results: generatedOTP,
     });
-
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -199,7 +204,7 @@ exports.resetPassword = async function (req, res) {
       });
     }
 
-    if (newPassword != confirmNewPassword ) {
+    if (newPassword != confirmNewPassword) {
       return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
         message: "confirm password must be match with new password!",
@@ -234,11 +239,11 @@ exports.resetPassword = async function (req, res) {
     const updatePassword = await users.update(
       { password: hashPassword(newPassword) },
       {
-        where: { email: email }
+        where: { email: email },
       }
     );
-    
-    if(!updatePassword){
+
+    if (!updatePassword) {
       return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
         message: "failed to update password or email not valid!",
@@ -249,7 +254,6 @@ exports.resetPassword = async function (req, res) {
       success: true,
       message: "success to reset password!",
     });
-
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -258,3 +262,4 @@ exports.resetPassword = async function (req, res) {
     });
   }
 };
+

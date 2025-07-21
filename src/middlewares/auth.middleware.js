@@ -1,7 +1,8 @@
 const jwt = require("jsonwebtoken");
 const { constants: http } = require("http2");
+const { isTokenBlacklisted } = require("../utils/blacklistToken");
 
-const verifyToken = (req, res, next) => {
+const verifyToken = async (req, res, next) => {
   const authHeader = req.headers["authorization"];
   if (!authHeader) {
     return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({ 
@@ -17,16 +18,23 @@ const verifyToken = (req, res, next) => {
   }
 
   try {
+    const isBlacklisted = await isTokenBlacklisted(token);
+    if (isBlacklisted) {
+      return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
+        message: "Token has been revoked. Please log in again."
+      });
+    }
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     if (!decoded.userId) {
       return res.status(http.HTTP_STATUS_FORBIDDEN).json({ 
-        message: "The token doesnt have a valid user ID." 
+        message: "The token doesnt have a valid user ID."   
       });
     }
 
     req.userId = decoded.userId;
     req.userRole = decoded.role;
+    req.token = token;
     next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {

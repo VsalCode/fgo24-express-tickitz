@@ -4,12 +4,12 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-const setOTP = async (email, otp, expirationMinutes = 10) => {
+const setOTP = async (email, otp, expirationMinutes) => {
   try {
     await ensureConnection();
     
     const key = `otp:${email}`;
-    const expirationSeconds = expirationMinutes * 3;
+    const expirationSeconds = expirationMinutes * 10;
     
     await redisClient.setEx(key, expirationSeconds, otp);
     
