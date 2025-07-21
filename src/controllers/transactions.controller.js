@@ -2,7 +2,7 @@ const { constants: http } = require("http2");
 const {
   transactions,
   transaction_details: transactionDetails,
-  payment_method: paymentMethod
+  payment_method: paymentMethod,
 } = require("../models");
 
 exports.bookingTickets = async function (req, res) {
@@ -33,16 +33,51 @@ exports.bookingTickets = async function (req, res) {
       !paymentMethodId ||
       !showDate ||
       !showTime ||
-      !seats
+      !seats ||
+      seats.length === 0
     ) {
       return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
-        message: "All fields are required!",
+        message: "All fields are required and seats cannot be empty!",
       });
     }
 
     let transactionResult;
     try {
+      const existingTransactions = await transactions.findAll({
+        where: {
+          show_date: showDate,
+          show_time: showTime,
+          cinema: cinema,
+          location: location,
+        },
+      });
+
+      if (existingTransactions && existingTransactions.length > 0) {
+        const bookedSeatsPromises = existingTransactions.map(async (trans) => {
+          const details = await transactionDetails.findAll({
+            where: {
+              transaction_id: trans.id,
+            },
+          });
+          return details.map((detail) => detail.seat);
+        });
+
+        const allBookedSeatsArrays = await Promise.all(bookedSeatsPromises);
+        const allBookedSeats = allBookedSeatsArrays.flat();
+
+        const alreadyBooked = seats.filter((seat) =>
+          allBookedSeats.includes(seat)
+        );
+
+        if (alreadyBooked.length > 0) {
+          return res.status(http.HTTP_STATUS_CONFLICT).json({
+            success: false,
+            message: `Seats: ${alreadyBooked.join(", ")} already booked. Please choose different seats.`,
+          });
+        }
+      }
+
       transactionResult = await transactions.create({
         user_id: userId,
         amount: amount,
@@ -58,9 +93,9 @@ exports.bookingTickets = async function (req, res) {
       });
 
       if (!transactionResult) {
-        return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
+        return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
           success: false,
-          message: "Failed while booking tickets",
+          message: "Failed to create transaction record.",
         });
       }
 
@@ -77,8 +112,9 @@ exports.bookingTickets = async function (req, res) {
         success: true,
         message: "Tickets booked successfully!",
         data: {
-          transactionId: transactionResult.id,
-        },
+          ...transactionResult.toJSON(),
+          seats: seats
+        }
       });
     } catch (err) {
       return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
@@ -90,7 +126,7 @@ exports.bookingTickets = async function (req, res) {
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
-      message: "error while processing request.",
+      message: "An unexpected error occurred while processing your request.",
       errors: err.message,
     });
   }
@@ -184,11 +220,11 @@ exports.getTransactionsHistory = async function (req, res) {
 exports.getPaymentMethods = async function (req, res) {
   try {
     const getPayments = await paymentMethod.findAll();
-    if(!getPayments){
+    if (!getPayments) {
       return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
-      success: false,
-      message: "error while get payment methods",
-    });  
+        success: false,
+        message: "error while get payment methods",
+      });
     }
 
     return res.status(http.HTTP_STATUS_OK).json({
