@@ -2,14 +2,28 @@ const { constants: http } = require("http2");
 const { movies, genres, directors, casts } = require("../models");
 const { Op } = require("sequelize");
 
-exports.getAllMovies = async function (_, res) {
+exports.getAllMovies = async function (req, res) {
   try {
+    const search = req.query.search;
+    const filterByGenre = req.query.filter;
+    const limit = req.query.limit;
+    const offset = req.query.offset;
+
     const moviesData = await movies.findAll({
       include: [
-        { model: genres, as: "genres" },
+        { 
+          model: genres, 
+          as: "genres",
+          where: filterByGenre && { id: parseInt(filterByGenre) } 
+        },
         { model: casts, as: "casts" },
         { model: directors, as: "directors" },
       ],
+      where: {
+        ...(search && { title : { [Op.iLike]: `%${search}%` }}),
+      },
+      limit: limit,
+      offset: offset,
     });
 
     return res.status(http.HTTP_STATUS_OK).json({
@@ -109,7 +123,7 @@ exports.getMovieDetail = async function (req, res) {
 exports.getNowShowingMovies = async function (_, res) {
   try {
     const today = new Date();
-    today.setHours(23, 59, 59, 999); 
+    today.setHours(23, 59, 59, 999);
 
     const twoMonthsAgo = new Date();
     twoMonthsAgo.setMonth(today.getMonth() - 2);
@@ -119,17 +133,15 @@ exports.getNowShowingMovies = async function (_, res) {
       where: {
         release_date: {
           [Op.gte]: twoMonthsAgo,
-          [Op.lte]: today
-        }
+          [Op.lte]: today,
+        },
       },
       include: [
         { model: genres, as: "genres" },
         { model: casts, as: "casts" },
         { model: directors, as: "directors" },
       ],
-      order: [
-        ['release_date', 'DESC']
-      ]
+      order: [["release_date", "DESC"]],
     });
 
     return res.status(http.HTTP_STATUS_OK).json({
@@ -173,19 +185,17 @@ exports.getUpcomingMovies = async function (_, res) {
     today.setHours(0, 0, 0, 0);
 
     const moviesData = await movies.findAll({
-       include: [
+      include: [
         { model: genres, as: "genres" },
         { model: casts, as: "casts" },
         { model: directors, as: "directors" },
       ],
-    where: {
-      release_date: {
-        [Op.gt]: today,
-      }
-    },
-    order: [
-        ['release_date', 'ASC'],
-    ]
+      where: {
+        release_date: {
+          [Op.gt]: today,
+        },
+      },
+      order: [["release_date", "ASC"]],
     });
 
     return res.status(http.HTTP_STATUS_OK).json({
@@ -214,7 +224,6 @@ exports.getUpcomingMovies = async function (_, res) {
         })),
       })),
     });
-
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
