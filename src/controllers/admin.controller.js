@@ -1,6 +1,6 @@
 const { constants: http } = require("http2");
-const { movies, genres, directors, casts } = require("../models");
-const { sequelize } = require("../models");
+const { movies, genres, directors, casts, sequelize } = require("../models");
+const { validationResult } = require("express-validator");
 
 exports.addNewMovie = async function (req, res) {
   const transaction = await sequelize.transaction();
@@ -36,45 +36,19 @@ exports.addNewMovie = async function (req, res) {
       voteAverage,
     } = req.body;
 
-    let castIds = castIdsString ? JSON.parse(castIdsString) : [];
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
+        success: false,
+        message: "Validation failed.",
+        errors: errors.array(),
+      });
+    }
+
+     let castIds = castIdsString ? JSON.parse(castIdsString) : [];
     let directorIds = directorIdsString ? JSON.parse(directorIdsString) : [];
     let genreIds = genreIdsString ? JSON.parse(genreIdsString) : [];
-    if (
-      !castIds.length ||
-      !directorIds.length ||
-      !genreIds.length ||
-      !overview ||
-      !releaseDate ||
-      !runtime ||
-      !title ||
-      !voteAverage
-    ) {
-      await transaction.rollback();
-      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
-        success: false,
-        message: "All fields are required and arrays cannot be empty!",
-      });
-    }
-
-    if (
-      !Array.isArray(castIds) ||
-      !Array.isArray(directorIds) ||
-      !Array.isArray(genreIds)
-    ) {
-      await transaction.rollback();
-      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
-        success: false,
-        message: "castIds, directorIds, and genreIds must be arrays",
-      });
-    }
-
-    if (!req.files || !req.files["poster"] || !req.files["backdrop"]) {
-      await transaction.rollback();
-      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
-        success: false,
-        message: "Both poster and backdrop files are required",
-      });
-    }
 
     const posterFile = req.files["poster"][0];
     const backdropFile = req.files["backdrop"][0];
@@ -88,9 +62,9 @@ exports.addNewMovie = async function (req, res) {
         overview,
         poster_path: posterFilename,
         release_date: releaseDate,
-        runtime: parseInt(runtime, 10),
+        runtime: runtime,
         title,
-        vote_average: parseFloat(voteAverage),
+        vote_average: voteAverage,
       },
       { transaction }
     );
@@ -141,14 +115,7 @@ exports.addNewMovie = async function (req, res) {
       success: true,
       message: "Add new movie successfully!",
       results: {
-        id: newMovie.id,
-        title: newMovie.title,
-        overview: newMovie.overview,
-        backdrop_path: newMovie.backdrop_path,
-        poster_path: newMovie.poster_path,
-        release_date: newMovie.release_date,
-        runtime: newMovie.runtime,
-        vote_average: newMovie.vote_average,
+        ...newMovie.toJSON(),
         genres: newMovie.genres.map((genre) => ({
           id: genre.id,
           name: genre.name,
