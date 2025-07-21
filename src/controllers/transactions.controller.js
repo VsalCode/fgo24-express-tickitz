@@ -4,6 +4,7 @@ const {
   transaction_details: transactionDetails,
   payment_method: paymentMethod,
 } = require("../models");
+const { validationResult } = require("express-validator");
 
 exports.bookingTickets = async function (req, res) {
   try {
@@ -22,23 +23,12 @@ exports.bookingTickets = async function (req, res) {
       seats,
     } = req.body;
 
-    if (
-      !amount ||
-      !cinema ||
-      !customerFullname ||
-      !customerEmail ||
-      !customerPhone ||
-      !location ||
-      !movieId ||
-      !paymentMethodId ||
-      !showDate ||
-      !showTime ||
-      !seats ||
-      seats.length === 0
-    ) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
       return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
-        message: "All fields are required and seats cannot be empty!",
+        message: 'Validation failed.',
+        errors: errors.array(),
       });
     }
 
