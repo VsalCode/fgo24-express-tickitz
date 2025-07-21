@@ -14,6 +14,7 @@ This project is a re-implementation of the Cinevo movie ticket booking applicati
 | POST   | /transactions             | Booking Tickets            |
 | GET    | /transactions             | Ticket Result              |
 | GET    | /transactions/history     | Transactions History       |
+| GET    | /transactions/payments    | Get All payment methods    |
 | GET    | /user                     | Get User Profile           |
 | PATCH  | /user                     | Update User Profile        |
 | POST   | /auth/register            | Register a new user        |
@@ -207,6 +208,7 @@ This project relies on the following Node.js packages:
 - Bcrypt: For hashing passwords.
 - Morgan: HTTP request logger middleware for Node.js.
 - Sequelize: ORM for Node.js, supporting PostgreSQL and other databases.
+- Express Validator: support request validation
 
 ## How To Contribute
 Pull requests are welcome! For major changes, please open an issue first to discuss your proposed changes. 
