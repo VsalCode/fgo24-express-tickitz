@@ -109,27 +109,32 @@ exports.getMovieDetail = async function (req, res) {
 exports.getNowShowingMovies = async function (_, res) {
   try {
     const today = new Date();
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(today.getMonth() - 2);
+    today.setHours(23, 59, 59, 999); 
+
+    const twoMonthsAgo = new Date();
+    twoMonthsAgo.setMonth(today.getMonth() - 2);
+    twoMonthsAgo.setHours(0, 0, 0, 0);
 
     const moviesData = await movies.findAll({
+      where: {
+        release_date: {
+          [Op.gte]: twoMonthsAgo,
+          [Op.lte]: today
+        }
+      },
       include: [
         { model: genres, as: "genres" },
         { model: casts, as: "casts" },
         { model: directors, as: "directors" },
       ],
-    },
-    { where: {
-      release_date: {
-        [Op.gte]: oneMonthAgo,
-        [Op.lte]: today
-      }
-    }}
-    );
+      order: [
+        ['release_date', 'DESC']
+      ]
+    });
 
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,
-      message: "Get all movies successfully!",
+      message: "Get now showing movies successfully!",
       results: moviesData.map((movie) => ({
         id: movie.id,
         title: movie.title,
