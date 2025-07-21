@@ -1,20 +1,47 @@
 const { constants: http } = require("http2");
-const { genres, directors, casts } = require("../models");
+const { movies, genres, directors, casts } = require("../models");
 
 exports.getAllMovies = async function (_, res) {
   try {
-
-    
+    const moviesData = await movies.findAll({
+      include: [
+        { model: genres, as: 'genres' },
+        { model: casts, as: 'casts' },
+        { model: directors, as: 'directors' }
+      ]
+    });
 
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,
-      message: "get all movies successfully!"
+      message: "Get all movies successfully!",
+      results: moviesData.map(movie => ({
+        id: movie.id,
+        title: movie.title,
+        overview: movie.overview,
+        backdrop_path: movie.backdrop_path,
+        poster_path: movie.poster_path,
+        release_date: movie.release_date,
+        runtime: movie.runtime,
+        vote_average: movie.vote_average,
+        genres: movie.genres.map(genre => ({
+          id: genre.id,
+          name: genre.name
+        })),
+        casts: movie.casts.map(cast => ({
+          id: cast.id,
+          name: cast.name
+        })),
+        directors: movie.directors.map(director => ({
+          id: director.id,
+          name: director.name
+        }))
+      }))
     });
 
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
-      message: "Failed to request update movie",
+      message: "Failed to retrieve movies",
       errors: err.message,
     });
   }
