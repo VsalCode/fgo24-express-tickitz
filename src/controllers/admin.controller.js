@@ -1,13 +1,5 @@
 const { constants: http } = require("http2");
-const {
-  movies,
-  movie_casts: movieCasts,
-  movie_directors: movieDirectors,
-  movie_genres: movieGenres,
-  genres,
-  directors,
-  casts,
-} = require("../models");
+const { movies, genres, directors, casts } = require("../models");
 const { sequelize } = require("../models");
 
 exports.addNewMovie = async function (req, res) {
@@ -44,21 +36,9 @@ exports.addNewMovie = async function (req, res) {
       voteAverage,
     } = req.body;
 
-    let castIds, directorIds, genreIds;
-    try {
-      castIds = castIdsString ? JSON.parse(castIdsString) : [];
-      directorIds = directorIdsString ? JSON.parse(directorIdsString) : [];
-      genreIds = genreIdsString ? JSON.parse(genreIdsString) : [];
-    } catch (parseError) {
-      await transaction.rollback();
-      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
-        success: false,
-        message:
-          "Invalid format for array fields. Use JSON arrays like [1,2,3]",
-        errors: parseError.message,
-      });
-    }
-
+    let castIds = castIdsString ? JSON.parse(castIdsString) : [];
+    let directorIds = directorIdsString ? JSON.parse(directorIdsString) : [];
+    let genreIds = genreIdsString ? JSON.parse(genreIdsString) : [];
     if (
       !castIds.length ||
       !directorIds.length ||
@@ -124,12 +104,7 @@ exports.addNewMovie = async function (req, res) {
       throw new Error("Some genre IDs are invalid");
     }
 
-    const genreMovieRelations = genreIds.map((genreId) => ({
-      movie_id: newMovie.id,
-      genre_id: genreId,
-    }));
-
-    await movieGenres.bulkCreate(genreMovieRelations, { transaction });
+    await newMovie.addGenres(genreIds, { transaction });
 
     const castRecords = await casts.findAll({
       where: { id: castIds },
@@ -140,12 +115,7 @@ exports.addNewMovie = async function (req, res) {
       throw new Error("Some cast IDs are invalid");
     }
 
-    const castMovieRelations = castIds.map((castId) => ({
-      movie_id: newMovie.id,
-      cast_id: castId,
-    }));
-
-    await movieCasts.bulkCreate(castMovieRelations, { transaction });
+    await newMovie.addCasts(castIds, { transaction });
 
     const directorRecords = await directors.findAll({
       where: { id: directorIds },
@@ -156,13 +126,16 @@ exports.addNewMovie = async function (req, res) {
       throw new Error("Some director IDs are invalid");
     }
 
-    const directorMovieRelations = directorIds.map((directorId) => ({
-      movie_id: newMovie.id,
-      director_id: directorId,
-    }));
-
-    await movieDirectors.bulkCreate(directorMovieRelations, { transaction });
+    await newMovie.addDirectors(directorIds, { transaction });
     await transaction.commit();
+
+    await newMovie.reload({
+      include: [
+        { model: genres, as: "genres" },
+        { model: casts, as: "casts" },
+        { model: directors, as: "directors" },
+      ],
+    });
 
     return res.status(http.HTTP_STATUS_CREATED).json({
       success: true,
@@ -176,15 +149,15 @@ exports.addNewMovie = async function (req, res) {
         release_date: newMovie.release_date,
         runtime: newMovie.runtime,
         vote_average: newMovie.vote_average,
-        genres: genreRecords.map((genre) => ({
+        genres: newMovie.genres.map((genre) => ({
           id: genre.id,
           name: genre.name,
         })),
-        casts: castRecords.map((cast) => ({
+        casts: newMovie.casts.map((cast) => ({
           id: cast.id,
           name: cast.name,
         })),
-        directors: directorRecords.map((director) => ({
+        directors: newMovie.directors.map((director) => ({
           id: director.id,
           name: director.name,
         })),
@@ -240,13 +213,13 @@ exports.updateMovie = async function (req, res) {
     let directorIds = directorIdsString ? JSON.parse(directorIdsString) : null;
     let genreIds = genreIdsString ? JSON.parse(genreIdsString) : null;
 
-    const movie = await movies.findByPk(movieId, { 
+    const movie = await movies.findByPk(movieId, {
       transaction,
       include: [
-        { model: genres, as: 'genres' },
-        { model: casts, as: 'casts' },
-        { model: directors, as: 'directors' }
-      ]
+        { model: genres, as: "genres" },
+        { model: casts, as: "casts" },
+        { model: directors, as: "directors" },
+      ],
     });
 
     if (!movie) {
@@ -258,15 +231,18 @@ exports.updateMovie = async function (req, res) {
       });
     }
 
-    await movie.update({
-      overview,
-      release_date: releaseDate,
-      runtime,
-      title,
-      vote_average: voteAverage,
-      backdrop_path,
-      poster_path,
-    }, { transaction });
+    await movie.update(
+      {
+        overview,
+        release_date: releaseDate,
+        runtime,
+        title,
+        vote_average: voteAverage,
+        backdrop_path,
+        poster_path,
+      },
+      { transaction }
+    );
 
     if (castIds) {
       await movie.setCasts(castIds, { transaction });
@@ -285,9 +261,9 @@ exports.updateMovie = async function (req, res) {
 
     await movie.reload({
       include: [
-        { model: genres, as: 'genres' },
-        { model: casts, as: 'casts' },
-        { model: directors, as: 'directors' }
+        { model: genres, as: "genres" },
+        { model: casts, as: "casts" },
+        { model: directors, as: "directors" },
       ],
     });
 
@@ -303,21 +279,20 @@ exports.updateMovie = async function (req, res) {
         release_date: movie.release_date,
         runtime: movie.runtime,
         vote_average: movie.vote_average,
-        genres: movie.genres.map(genre => ({
+        genres: movie.genres.map((genre) => ({
           id: genre.id,
-          name: genre.name
+          name: genre.name,
         })),
-        casts: movie.casts.map(cast => ({
+        casts: movie.casts.map((cast) => ({
           id: cast.id,
-          name: cast.name
+          name: cast.name,
         })),
-        directors: movie.directors.map(director => ({
+        directors: movie.directors.map((director) => ({
           id: director.id,
-          name: director.name
-        }))
+          name: director.name,
+        })),
       },
     });
-
   } catch (error) {
     if (!isTransactionFinished) {
       await transaction.rollback();
@@ -326,7 +301,7 @@ exports.updateMovie = async function (req, res) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
       message: "Failed to request update movie",
-      errors: error.message
+      errors: error.message,
     });
   }
 };
@@ -351,7 +326,7 @@ exports.deleteMovie = async function (req, res) {
     }
 
     const movieIdParams = req.params.id;
-    
+
     if (!movieIdParams || isNaN(movieIdParams)) {
       return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
         success: false,
@@ -360,7 +335,7 @@ exports.deleteMovie = async function (req, res) {
     }
 
     const movieIdInt = parseInt(movieIdParams);
-    
+
     const existingMovie = await movies.findByPk(movieIdInt);
     if (!existingMovie) {
       return res.status(http.HTTP_STATUS_NOT_FOUND).json({
@@ -384,7 +359,6 @@ exports.deleteMovie = async function (req, res) {
       success: true,
       message: `Movie with id ${movieIdInt} deleted successfully`,
     });
-
   } catch (err) {
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
       success: false,
