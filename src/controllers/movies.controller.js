@@ -1,24 +1,23 @@
 const { constants: http } = require("http2");
 const { movies, genres, directors, casts, Sequelize } = require("../models");
 const { Op } = require("sequelize");
-const { redisClient, ensureConnection } = require('../lib/redis'); 
+const { redisClient, ensureConnection } = require("../lib/redis");
 
 exports.getAllMovies = async function (req, res) {
   try {
     await ensureConnection();
 
-    const search = req.query.search || '';
-    const filterByGenre = req.query.filter || '';
+    const search = req.query.search || "";
+    const filterByGenre = req.query.filter || "";
     const limit = req.query.limit || 10;
     const offset = req.query.offset || 0;
-    const sortBy = req.query.sortBy || 'created_at_asc';
+    const sortBy = req.query.sortBy || "created_at_asc";
 
     const cacheKey = `movies:`;
-
     const cachedData = await redisClient.get(cacheKey);
 
     if (cachedData) {
-      console.log('Serving from cache:', cacheKey);
+      console.log("Serving from cache:", cacheKey);
       return res.status(http.HTTP_STATUS_OK).json({
         success: true,
         message: "Get all movies successfully from cache!",
@@ -40,7 +39,7 @@ exports.getAllMovies = async function (req, res) {
       } else if (sortBy == "popularity") {
         order.push(["popularity", "DESC"]);
       } else if (sortBy == "created_at_asc") {
-        order.push(['created_at', 'ASC']);
+        order.push(["created_at", "ASC"]);
       }
     }
 
@@ -58,7 +57,7 @@ exports.getAllMovies = async function (req, res) {
       where: {
         ...(search && { title: { [Op.iLike]: `%${search}%` } }),
       },
-      order: order.length > 0 ? order : [['created_at', 'ASC']],
+      order: order.length > 0 ? order : [["created_at", "ASC"]],
       limit: parseInt(limit),
       offset: parseInt(offset),
     });
@@ -94,7 +93,6 @@ exports.getAllMovies = async function (req, res) {
       message: "Get all movies successfully!",
       results: formattedMoviesData,
     });
-
   } catch (err) {
     console.error("Error in getAllMovies:", err);
     return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
@@ -104,7 +102,6 @@ exports.getAllMovies = async function (req, res) {
     });
   }
 };
-
 
 exports.getMovieDetail = async function (req, res) {
   try {
@@ -167,6 +164,18 @@ exports.getMovieDetail = async function (req, res) {
 
 exports.getNowShowingMovies = async function (_, res) {
   try {
+    const cacheKey = `now-showing:`;
+    const cachedData = await redisClient.get(cacheKey);
+
+    if (cachedData) {
+      console.log("Serving from cache:", cacheKey);
+      return res.status(http.HTTP_STATUS_OK).json({
+        success: true,
+        message: "Get all movies successfully from cache!",
+        results: JSON.parse(cachedData),
+      });
+    }
+
     const today = new Date();
     today.setHours(23, 59, 59, 999);
 
@@ -188,6 +197,8 @@ exports.getNowShowingMovies = async function (_, res) {
       ],
       order: [["release_date", "DESC"]],
     });
+
+    await redisClient.setEx(cacheKey, 3600, JSON.stringify(moviesData));
 
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,
@@ -226,6 +237,18 @@ exports.getNowShowingMovies = async function (_, res) {
 
 exports.getUpcomingMovies = async function (_, res) {
   try {
+    const cacheKey = `now-showing:`;
+    const cachedData = await redisClient.get(cacheKey);
+
+    if (cachedData) {
+      console.log("Serving from cache:", cacheKey);
+      return res.status(http.HTTP_STATUS_OK).json({
+        success: true,
+        message: "Get all movies successfully from cache!",
+        results: JSON.parse(cachedData),
+      });
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -242,6 +265,8 @@ exports.getUpcomingMovies = async function (_, res) {
       },
       order: [["release_date", "ASC"]],
     });
+
+    await redisClient.setEx(cacheKey, 3600, JSON.stringify(moviesData));
 
     return res.status(http.HTTP_STATUS_OK).json({
       success: true,
