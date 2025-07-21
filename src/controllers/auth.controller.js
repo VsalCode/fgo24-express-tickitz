@@ -263,3 +263,42 @@ exports.resetPassword = async function (req, res) {
   }
 };
 
+
+/**
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ * @returns
+ */
+exports.logout = async function (req, res) {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(http.HTTP_STATUS_UNAUTHORIZED).json({
+        success: false,
+        message: "You're not login!",
+      });
+    }
+
+    const token = req.token;
+    const isBlacklisted = await blacklistToken(token);
+
+    if (!isBlacklisted) {
+      return res.status(http.HTTP_STATUS_BAD_REQUEST).json({
+        success: isBlacklisted.status,
+        message: isBlacklisted.message,
+      });
+    }
+
+    return res.status(http.HTTP_STATUS_OK).json({
+      success: true,
+      message: "logout successfully!",
+    });
+
+  } catch (err) {
+    return res.status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: "Failed to request login!",
+      errors: err.message,
+    });
+  }
+};
